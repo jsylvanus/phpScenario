@@ -39,6 +39,7 @@ class Scenario_Core {
      */
     protected static $_defaultConfig = array(
         'classPrefix' => 'Experiment_',
+        'partialPath' => '',
         // the following are not yet in use, but are assumed to be these values.
         'createMissingExperiments' => true,
         'createMissingTreatments' => true,
@@ -167,6 +168,64 @@ class Scenario_Core {
     }
 
     /**
+     * Includes a file depending on the experiment/treatment.
+     *
+     * Retrieves the experiment in question and renders it by including a file
+     * according to the 'partialPath' setting. If $options is provided with a
+     * Zend_View object, this method will attempt to render the partial file
+     * in the context of that view.
+     *
+     * Valid options array keys:
+     * <ul>
+     *      <li><b>view</b>: Should be a Zend_View object ("$this" in the view context)</li>
+     *      <li><b>path</b>: Path to use instead of that in settings. If left blank,
+     *          this will use the 'partialPath' setting plus a filtered version
+     *          of the experiment name.</li>
+     *      <li><b>map</b>: filenames to map the treatment names to (defaults to [treatment].php),
+     *          for example "array('default'=>'_main.phtml','alternate'=>'_alt.phtml')"</li>
+     *      <li><b>vars</b>: if using <b>view</b>, the vars key will be passed to
+     *          the view's assign() function (good for looping)</li>
+     * </ul>
+     *
+     * @param string|Scenario_Experiment $experiment the experiment to use
+     * @param array $options options for the UsePartial method
+     */
+    public static function UsePartial($experiment, $ident = null, array $options = array()) {
+        $treatment = self::Treatment($experiment, $ident);
+
+        $expName = $treatment->getExperiment()->getExperimentID();
+        $safeExpName = preg_replace('/([^a-z0-9_\.])/i','_',strtolower($expName));
+
+        $basepath = array_key_exists('path', $options) ?
+            realpath($options['path']) :
+            realpath(self::getInstance()->getOption('partialPath') . DIRECTORY_SEPARATOR . $safeExpName);
+
+        // sanity
+        if (!file_exists($basepath)) {
+            throw new Scenario_Exception('UsePartial was unable to locate the directory "'.$basepath.'"');
+        }
+
+        $filename = array_key_exists('map', $options) ?
+            $options['map'][$treatment->getName()] :
+            $treatment->getName() . '.php';
+
+        if (array_key_exists('view', $options) && $options['view'] instanceof Zend_View) {
+            $view = clone $options['view'];
+            if (array_key_exists('vars', $options) && is_array($options['vars'])) {
+                $view->clearVars();
+                $view->assign($options['vars']);
+            }
+            $view->addScriptPath($basepath);
+            echo $view->render($filename);
+        } else {
+            $file = $basepath . DIRECTORY_SEPARATOR . $filename;
+            if (file_exists($file)) {
+                include $file;
+            }
+        }
+    }   
+
+    /**
      * Render the results of an experiment.
      *
      * Example:
@@ -239,6 +298,8 @@ class Scenario_Core {
      * @param array $config Configuration options. 
      */
     public function __construct(array $config = array()) {
+        // set default partials path to lib/partials assuming we're in lib/Scenario
+        self::$_defaultConfig['partialPath'] = realpath(dirname(__FILE__).'/../partials');
         $this->config(array_merge(self::$_defaultConfig, $config));
         
         /**
