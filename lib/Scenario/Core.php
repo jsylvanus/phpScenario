@@ -188,6 +188,7 @@ class Scenario_Core {
      * </ul>
      *
      * @param string|Scenario_Experiment $experiment the experiment to use
+     * @param Scenario_Identity $ident identity to apply to the experiment
      * @param array $options options for the UsePartial method
      */
     public static function UsePartial($experiment, $ident = null, array $options = array()) {
