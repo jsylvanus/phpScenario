@@ -173,21 +173,13 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
                         $xml->writeAttribute('control', 'control');
                     }
 
-                    $xml->startElement('rawdata');
-                    $xml->writeAttribute('total', $tTotal);
-                    $xml->writeAttribute('completed', $tComplete);
-                    $xml->endElement(); // rawdata
-
-                    $xml->startElement('statistics');
-
-                    if ($key != $controlName) {
-                        $zscore = ($tRate - $cRate) / sqrt( ( ($tRate * (1.0 - $tRate)) / floatval($tTotal)) + ( ($cRate * (1.0 - $cRate)) / floatval($cTotal)) );
-                        $xml->writeAttribute('zscore', $zscore);
+					$this->_xmlSingleTag($xml, 'rawdata', array('total' => $tTotal, 'completed' => $tComplete));
+                    
+					$stats = array('conversion' => $tRate * 100.0);
+					if ($key != $controlName) {
+                        $stats['zscore'] = ($tRate - $cRate) / sqrt( ( ($tRate * (1.0 - $tRate)) / floatval($tTotal)) + ( ($cRate * (1.0 - $cRate)) / floatval($cTotal)) );
                     }
-
-                    $xml->writeAttribute('conversion', $tRate * 100.0);
-
-                    $xml->endElement(); // statistics
+					$this->_xmlSingleTag($xml, 'statistics', $stats);
 
                     $xml->endElement(); // treatment
                 }
@@ -203,6 +195,14 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
         $dom->loadXML($xml->outputMemory());
         return $dom;
     }
+	
+	private function _xmlSingleTag($xml, $tagname, $atts) {
+		$xml->startElement($tagname);
+		foreach($atts as $att => $val) {
+			$xml->writeAttribute($att, $val);
+		}
+		$xml->endElement();
+	}
 
     /**
      * Get an array that summarizes the result set.
@@ -222,7 +222,7 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
 
         if (!($resultSet instanceof Scenario_ResultSet)) {
             require_once 'Scenario/Exception.php';
-            throw new Scenario_Exception('resultsAsXml only accepts Scenario_Result and Scenario_ResultSet objects.');
+            throw new Scenario_Exception('getDataFromResults only accepts Scenario_Result and Scenario_ResultSet objects.');
         }
 
         $data = array(

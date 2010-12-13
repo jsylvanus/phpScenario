@@ -163,7 +163,7 @@ abstract class Scenario_Data_Adapter {
      * @param string|Scenario_Experiment Experiment to fetch results for
      * @return Scenario_ResultSet results
      */
-    public abstract function GetResults($experiment);
+    public abstract function GetResults($experiment, $start = 0, $limit = 5000);
 
     /**
      * Retrieve the current treatment in use by a test/id combo. Returns null if not yet in use.

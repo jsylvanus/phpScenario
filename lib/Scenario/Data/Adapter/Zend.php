@@ -499,7 +499,7 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
      * @param mixed Experiment to fetch results for, accepts string or Scenario_Experiment object.
      * @return Scenario_ResultSet Result collection.
      */
-    public function GetResults($experiment) {
+    public function GetResults($experiment, $start = 0, $limit = 5000) {
         if (is_string($experiment))
             $experiment = $this->GetExperimentByName($experiment);
         if (!($experiment instanceof Scenario_Experiment)) {
@@ -513,7 +513,8 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
 
         $query = $this->getDbAdapter()->select()
                 ->from($usrs)->joinLeft($trts, $usrs . '.treatment_id = ' . $trts . '.id')
-                ->where($trts.'.experiment_id = ?', $experiment->getRowID());
+                ->where($trts.'.experiment_id = ?', $experiment->getRowID())
+				->limit($limit, $start);
 
         $results = $this->getDbAdapter()->fetchAll($query);
 

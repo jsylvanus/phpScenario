@@ -55,7 +55,7 @@ class Scenario_Core {
      */
     protected static $_instance;
 
-    /**
+	/**
      * Accesses the Core singleton instance
      *
      * @static
@@ -291,6 +291,13 @@ class Scenario_Core {
      * @var Scenario_Data_Adapter
      */
     protected $_adapter;
+		
+	/**
+	 * The multivariate experiment stack.
+	 * 
+	 * @var array 
+	 */
+	protected $_multivariate_stack;
 
     /**
      * Constructor. This is usually handled by the singleton pattern, constructing a core
@@ -302,6 +309,7 @@ class Scenario_Core {
         // set default partials path to lib/partials assuming we're in lib/Scenario
         self::$_defaultConfig['partialPath'] = realpath(dirname(__FILE__).'/../partials');
         $this->config(array_merge(self::$_defaultConfig, $config));
+		$this->_multivariate_stack = array();
         
         /**
          * @see Scenario_Identity
@@ -315,6 +323,58 @@ class Scenario_Core {
 
         Scenario_Identity::setProvider(new Scenario_Identity_Provider_Session());
     }
+	
+	/**
+	 * Push a multivariate onto the stack.
+	 * 
+	 * 
+	 * 
+	 * @param Scenario_Experiment $mv_experiment 
+	 */
+	public function pushMultivariate($mv_experiment) {
+		array_push($this->_multivariate_stack, $mv_experiment);
+	}
+	
+	/**
+	 * Pops a multivariate off the stack.
+	 * 
+	 * @param Scenario_Experiment|string $which
+	 * @return Scenario_Experiment
+	 */
+	public function popMultivariate($which = null) {
+		if (count($this->_multivariate_stack) > 0) {
+			if ($which === null)
+				return array_pop($this->_multivariate_stack);
+			else if (is_string($which)) {
+				foreach($this->_multivariate_stack as $i => $mv) {
+					/* @var $mv Scenario_Experiment */
+					if ($mv->getExperimentID() == $which) {
+						$spl = array_splice($this->_multivariate_stack, $i);
+						return $spl[0];
+					}
+				}
+			} else if ($which instanceof Scenario_Experiment) {
+				$spl = array_search($which, $this->_multivariate_stack);
+				if ($spl !== false) {
+					$out = array_splice($this->_multivariate_stack, $spl);
+					return $out[0];
+				}
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Returns the current top-most element on the Multivariate stack.
+	 * 
+	 * @return Scenario_Experiment Top-most multivariate experiment or null if stack is empty.
+	 */
+	public function currentMultivariate() {
+		$n = count($this->_multivariate_stack);
+		if ($n > 0)
+			return $this->_multivariate_stack[$n - 1];
+		return null;
+	}
 
     /**
      * Set configuration options.

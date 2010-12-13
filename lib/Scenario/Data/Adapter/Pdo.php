@@ -471,7 +471,7 @@ class Scenario_Data_Adapter_Pdo extends Scenario_Data_Adapter {
      * @param mixed Experiment to fetch results for, accepts string or Scenario_Experiment object.
      * @return Scenario_ResultSet Result collection.
      */
-    public function GetResults($experiment) {
+    public function GetResults($experiment, $start = 0, $limit = 5000) {
         if (is_string($experiment))
             $experiment = $this->GetExperimentByName($experiment);
         if (!($experiment instanceof Scenario_Experiment)) {
@@ -487,7 +487,7 @@ class Scenario_Data_Adapter_Pdo extends Scenario_Data_Adapter {
         $usrs = $this->usersTreatmentsTable;
 
         $sql = 'SELECT * FROM `'.$usrs.'` LEFT JOIN `'.$trts.'` ON '.$usrs.'.treatment_id = '.$trts.'.id '
-            .'WHERE '.$trts.'.experiment_id = ?';
+            .'WHERE '.$trts.'.experiment_id = ? LIMIT '.$start.', '.$limit;
         $results = $this->prepare($sql, array($experiment->getRowID()))->fetchAll(PDO::FETCH_ASSOC);
 
         /**

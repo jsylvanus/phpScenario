@@ -30,6 +30,13 @@
  */
 class Scenario_Experiment {
 
+	/**
+	 * Data analyzer for the experiment, created by calling getResults
+	 * 
+	 * @var Scenario_Data_Analyzer
+	 */
+	protected $_analyzer;
+	
     /**
      * Name of the experiment.
      *
@@ -154,7 +161,8 @@ class Scenario_Experiment {
      * @return Scenario_ResultSet
      */
     public function getResults() {
-        return $this->getCore()->getAdapter()->GetResults($this);
+        $this->_analyzer = $this->_analyzer !== null ? $this->_analyzer : new Scenario_Data_Analyzer($this->getCore(), $this);
+		return $this->_analyzer->results;
     }
 
     /**
