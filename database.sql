@@ -1,9 +1,10 @@
 DROP TABLE IF EXISTS `experiments`;
 CREATE TABLE `experiments` (
     `id` int(11) NOT NULL PRIMARY KEY AUTO_INCREMENT,
-    `name` varchar(50) NOT NULL UNIQUE KEY,
+    `name` varchar(50) NOT NULL,
     `data` text,
 	`parent_id` int(11),
+	UNIQUE KEY `uniq_exp_name` (`name`,`parent_id`),
 	FOREIGN KEY `fk_exp_parent` (`parent_id`) 
 		REFERENCES `experiments` (`id`) 
 		ON DELETE CASCADE ON UPDATE CASCADE

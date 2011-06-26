@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,41 +26,69 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Result {
-
-    /**
-     *
-     * @var Scenario_Identity
-     */
-    protected $_ident;
-
-    /**
-     *
-     * @var bool
-     */
-    protected $_completed;
-
-    /**
-     *
-     * @var Scenario_Treatment
-     */
-    protected $_treatment;
-
-    /**
-     * Experiment. May be a string or Scenario_Experiment object.
-     *
-     * @var mixed
-     */
-    protected $_experiment;
-
-    public function __construct($experiment, $treatment, $identity, $completed) {
-        $this->setExperiment($experiment);
-        $this->setTreatment($treatment);
-        $this->setIdentity($identity);
-        $this->_completed = $completed;
+	
+	public $user_id;
+	public $completed;
+	public $treatment_id;
+	public $treatment_name;
+	public $experiment_name;
+	public $experiment_id;
+	public $experiment_data;
+	public $parent_id;
+	public $parent_name;
+	public $parent_data;
+	
+	protected $_experiment;
+	protected $_parent;
+	protected $_identity;
+	protected $_treatment;
+	
+	private $_core;
+	
+    public function __construct($userid, $completed = null, $treatmentid = null, $treatmentname = null, 
+			$experimentid = null, $experimentname = null, $experimentdata = null, $parentid = null, 
+			$parentname = null, $parentdata = null, $core = null) 
+	{
+		$loadme = array();
+		if (!is_array($userid)) {
+			$loadme = array(
+				'user_id' => $userid,
+				'completed' => $completed,
+				'treatment_id' => $treatmentid,
+				'treatment_name' => $treatmentname,
+				'experiment_id' => $experimentid,
+				'experiment_name' => $experimentname,
+				'experiment_data' => $experimentdata,
+				'parent_id' => $parentid,
+				'parent_name' => $parentname,
+				'parent_data' => $parentdata
+			);
+			$this->setCore($core);
+		} else {
+			if (array_key_exists('core', $userid)) {
+				$this->setCore($userid['core']);
+				unset($userid['core']);
+			} else if ($completed instanceof Scenario_Core) {
+				$this->setCore($completed);
+			}
+			$loadme = $userid;
+		}
+		$this->user_id = $loadme['user_id'];
+		$this->completed = ($loadme['completed'] == '1');
+		$this->treatment_id = $loadme['treatment_id'];
+		$this->treatment_name = $loadme['treatment_name'];
+		$this->experiment_id = $loadme['experiment_id'];
+		$this->experiment_name = $loadme['experiment_name'];
+		$this->experiment_data = is_string($loadme['experiment_data']) ? unserialize($loadme['experiment_data']) : $loadme['experiment_data']; 
+		if ($loadme['parent_id'] != null) {
+			$this->parent_id = $loadme['parent_id'];
+			$this->parent_name = $loadme['parent_name'];
+			$this->parent_data = is_string($loadme['parent_data']) ? unserialize($loadme['parent_data']) : $loadme['parent_data'];
+		}
     }
 
     /**
@@ -68,24 +96,33 @@ class Scenario_Result {
      * @return bool Whether the treatment was completed or not.
      */
     public function isCompleted() {
-        return $this->_completed;
+        return $this->completed;
     }
 
+	/**
+	 *
+	 * @return bool Whether the treatment is attached to a parent experiment or not.
+	 */
+	public function isMultivar() {
+		return $this->_parent != null;
+	}
+	
     /**
      * Gets the associated experiment, optionally resolving it to an object if it's a string.
      *
-     * @param bool $tryResolve (Optional) Whether the experiment should be resolved to an object if it is a string.
      * @return Scenario_Experiment The experiment associated with this result.
      */
-    public function getExperiment($tryResolve = true) {
-        if ($this->_experiment === null)
-            return null;
-        else if (is_string($this->_experiment) && $tryResolve) {
-            $result = $this->getCore()->GetExperimentByName($this->_experiment);
-            if ($result instanceof Scenario_Experiment)
-                $this->_experiment = $result;
-        }
-        return $this->_experiment;
+    public function getExperiment() {
+        if ($this->_experiment === null) {
+			$this->_experiment = new Scenario_Experiment(
+				$this->experiment_name, $this->experiment_id, 
+				false, $this->experiment_data
+			);
+			if ($this->parent_id !== null) {
+				$this->_experiment->setParent($this->getParent());
+			}
+		}
+		return $this->_experiment;
     }
 
     /**
@@ -94,17 +131,27 @@ class Scenario_Result {
      * @return Scenario_Treatment
      */
     public function getTreatment() {
-        if (is_string($this->_treatment)) {
-            require_once 'Scenario/Treatment.php';
-            $this->_treatment = new Scenario_Treatment($this->_treatment, $this->getExperiment());
-            return $this->_treatment;
-        } else if ($this->_treatment instanceof Scenario_Treatment || $this->_treatment === null) {
-            return $this->_treatment;
-        } else {
-            require_once 'Scenario/Exception.php';
-            throw new Scenario_Exception('Treatment was not a string, null, or instance of Scenario_Treatment.');
-        }
+        if ($this->_treatment === null) {
+			$this->_treatment = new Scenario_Treatment(
+				$this->treatment_name, $this->getExperiment(), $this->treatment_id
+			);
+		}
+		return $this->_treatment;
     }
+	
+	public function getParent() {
+		if ($this->parent_id === null) 
+			return null;
+		if ($this->_parent === null) {
+			$this->_parent = new Scenario_Experiment(
+				$this->parent_name, 
+				$this->parent_id, 
+				false, 
+				array_merge($this->parent_data, array('children' => $this->getExperiment()))
+			);
+		}
+		return $this->_parent;
+	}
 
     /**
      * Returns the identity associated with this result.
@@ -112,60 +159,10 @@ class Scenario_Result {
      * @return Scenario_Identity
      */
     public function getIdentity() {
-        return $this->_ident;
-    }
-
-    /**
-     * Set the associated experiment.
-     *
-     * @param mixed $value Must be null, a string, or an instance of Scenario_Experiment
-     */
-    public function setExperiment($value) {
-        if (is_string($value)) {
-            $this->_experiment = $value;
-            $this->getExperiment(); // attempt to resolve the experiment name
-        } else if ($value instanceof Scenario_Experiment || $value === null) {
-            $this->_experiment = $value;
-        } else {
-            require_once 'Scenario/Exception.php';
-            throw new Scenario_Exception('Experiment must be set to null, a string, or an instance of Scenario_Experiment.');
-        }
-    }
-
-    /**
-     * Set the associated treatment.
-     * 
-     * @param mixed $value Must be a null, a string, or an instance of Scenario_Treatment.
-     */
-    public function setTreatment($value) {
-        if (is_string($value)) {
-            if ($this->getExperiment() !== null) {
-                require_once 'Scenario/Treatment.php';
-                $this->_treatment = new Scenario_Treatment($value, $this->getExperiment(), null);
-            }
-        } else if ($value instanceof Scenario_Treatment || $value === null) {
-            $this->_treatment = $value;
-        } else {
-            require_once 'Scenario/Exception.php';
-            throw new Scenario_Exception('Treatment must be set to null, a string, or an instance of Scenario_Treatment.');
-        }
-    }
-
-    /**
-     * Set the associated identity.
-     *
-     * @param mixed $value Must be null, a string, or an instance of Scenario_Identity.
-     */
-    public function setIdentity($value) {
-        require_once 'Scenario/Identity.php';
-        if (is_string($value)) {
-            $this->_ident = new Scenario_Identity($value);
-        } else if ($value instanceof Scenario_Identity || $value === null) {
-            $this->_ident = $value;
-        } else {
-            require_once 'Scenario/Exception.php';
-            throw new Scenario_Exception('Identity must be set to null, a string, or an instance of Scenario_Identity.');
-        }
+		if ($this->_identity === null) {
+			$this->_identity = new Scenario_Identity($this->user_id);
+		}
+        return $this->_identity;
     }
 
     /**
@@ -174,8 +171,25 @@ class Scenario_Result {
      * @return Scenario_Core
      * @todo Use a reference to the core rather than the singleton.
      */
-    public function getCore() {
-        return Scenario_Core::getInstance();
+    public function getCore($default_to_singleton = true) {
+		if ($this->_core == null && $default_to_singleton)
+			return Scenario_Core::getInstance();
+		return $this->_core;
     }
+	
+	/**
+	 *
+	 * @param Scenario_Core $core 
+	 */
+	public function setCore($core) {
+		if ($core instanceof Scenario_Core) {
+			$this->_core = $core;
+		} else if ($core === null) {
+			$this->_core = null;
+		} else {
+			require_once 'Scenario/Exception.php';
+			throw new Scenario_Exception('Core cannot be set to a non-core object');
+		}
+	}
 
 }

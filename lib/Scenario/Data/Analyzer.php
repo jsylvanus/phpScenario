@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,15 +26,40 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Data_Analyzer {
 	
+	/**
+	 *
+	 * @var array
+	 */
 	protected $_analysis;
-	protected $_overall_analysis;
+	
+	public function getResults($analysis_only = true, $for_expname = null) {
+		if ($for_expname == null) {
+			$out = array();
+			foreach($this->_analysis as $tname => $results) {
+				$out[$tname] = $analysis_only ? $results['analysis'] : $results;
+			}
+			return $out;
+		} 
+		return $analysis_only ? 
+			$this->_analysis[$for_expname]['analysis'] : 
+			$this->_analysis[$for_expname];
+	}
+	
+	/**
+	 *
+	 * @var Scenario_Data_Consolidator
+	 */
 	protected $_rawData;
 	
+	/**
+	 *
+	 * @var Scenario_Experiment
+	 */
 	protected $_lastExperiment;
 	
 	/**
@@ -58,81 +83,157 @@ class Scenario_Data_Analyzer {
 	
 	public function analyzeExperiment($experiment) {
 		$this->_lastExperiment = $experiment;
-		$this->_analysis = array();
 		
-		// $parts = $experiment->getParts();
-		
-		// getParts should return an array of variants, treating all experiments
-		// as multivariates. a simple a/b test just returns array('default')
 		try {
 			$this->_rawData = $this->_loadResults();
-//			foreach ($parts as $value) {
-//				$this->_analysis[$value] = $this->_analyzeSection($value);
-//			} // set the analysis keys
-//			$this->_overall_analysis = $this->_summarize();
+			$this->_analysis = $this->_summarize();
 		} catch (Scenario_Data_Exception $e) {
 			require_once 'Scenario/Exception.php';
-			throw new Scenario_Exception('A data exception occurred while processing results', 0, $e);
+			throw new Scenario_Exception('A data exception occurred while processing results: ' . $e->getMessage());
 		} catch (Scenario_Exception $e) {
-			throw new Exception('A general Scenario exception occurred while processing results', 0, $e);
+			throw new Exception('A general Scenario exception occurred while processing results: ' . $e->getMessage());
 		} catch (Exception $e) {
 			// well, shit.
 			throw $e;
 		}
 	}
 	
+	public function getLastExperiment() {
+		return $this->_lastExperiment;
+	}
+	
+	/**
+	 * 
+	 * @return Scenario_Data_Consolidator 
+	 */
 	private function _loadResults() {
 		if ($this->_lastExperiment === null) {
 			require_once 'Scenario/Exception.php';
-			throw new Scenario_Exception('_analyzeSection called while _lastExperiment is null');
+			throw new Scenario_Exception('_loadResults called while _lastExperiment is null');
 		}
 		$exp = $this->_lastExperiment;
 		
-		$data = array(
-            'results' => array(),
-            'total_records' => 0
-        );
+		require_once 'Scenario/Data/Consolidator.php';
+		$data = new Scenario_Data_Consolidator(array());
 		
 		// get data in chunks
 		$limit = 1000;
 		$start = 0;
+		$numresults = 0;
 		do {
 			$results = $this->_core->getAdapter()->GetResults($exp, $start, $limit);
+			$numresults = count($results);
 			$start += $limit;
 			foreach($results as $result) {
 				if ($result instanceof Scenario_Result) {
-					$expid = $result->getExperiment()->getExperimentID();
-					// TODO: parent id handling here for multivariate (nested experiments)
-					
-					$treatment = $result->getTreatment()->getName();
-					if (!array_key_exists($expid, $data['results'])) {
-						$data['results'][$expid] = array(
-							'_total' => 0
-						);
-					}
-					if (!array_key_exists($treatment, $data['results'][$expid])) {
-						$data['results'][$expid][$treatment] = array(
-							'total' => 0,
-							'completed' => 0,
-						);
-					}
-					$data['results'][$expid][$treatment]['total']++;
-					if ($result->isCompleted())
-						$data['results'][$expid][$treatment]['completed']++;
-					$data['total_records']++;
-					$data['results'][$expid]['_total']++;
+					$data->addResult($result);
 				} else {
 					require_once 'Scenario/Exception.php';
 					throw new Scenario_Exception('Scenario_ResultSet must contain only Scenario_Result objects.');
 				}
 			}
-		} while (count($results) >= $limit);
+			unset($results);
+		} while ($numresults >= $limit);
 		
 		return $data;
 	}
 	
 	private function _summarize() {
 		
+		$results = array();
+		// string array
+		foreach($this->_rawData->getExperimentNames() as $expName) {
+			// raw data array
+			$data = $this->_rawData->getExperimentData($expName);
+			if (!$data['_multivar']) {
+				// multivar experiment
+				$data['analysis'] = array(
+					'total_tested'		=> 0,
+					'total_converted'	=> 0,
+					'conversion_rate'	=> 0.0,
+					'treatments'		=> array()
+				);
+				$analysis = &$data['analysis'];
+				$treatments = &$analysis['treatments'];
+				// first pass: totals & per-treatment c-rates
+				foreach($data['_treatments'] as $tname => $vals) {
+					$analysis['total_tested'] += $treatments[$tname]['total_tested'] = $vals['total'];
+					$analysis['total_converted'] += $treatments[$tname]['total_converted'] = $vals['completed'];
+					$treatments[$tname]['conversion_rate'] = floatval($vals['completed']) / floatval($vals['total']);
+				}
+				$analysis['conversion_rate'] = floatval($analysis['total_converted']) / floatval($analysis['total_tested']);
+				// second pass: per-treatment calculations
+				foreach($data['_treatments'] as $tname => $vals) {
+					
+					// percent tested
+					$pct = $treatments[$tname]['percent_tested'] = $vals['total'] / floatval($analysis['total_tested']);
+					// standard error
+					$stderr = $treatments[$tname]['standard_error'] = sqrt( ($pct * ( 1 - $pct )) / floatval($vals['total']) );
+					// 95% confidence interval
+					$treatments[$tname]['high_confidence'] = $stderr * 1.96;
+					// z-score
+					$cRate = $analysis['conversion_rate'];
+					$cTotal = $analysis['total_tested'];
+					$tRate = $treatments[$tname]['conversion_rate'];
+					$tTotal = $vals['total'];
+					$treatments[$tname]['z_score'] = ($tRate - $cRate) / sqrt( ( ($tRate * (1.0 - $tRate)) / floatval($tTotal)) + ( ($cRate * (1.0 - $cRate)) / floatval($cTotal)) );;
+				}
+
+			} else {
+				// multivar
+				
+			}
+			
+			$results[$expName] = $data;
+		}
+		$this->_analysis = $results;
+		return $results;
+		/*
+		 * Stuff to calculate:
+		 * 1. total results
+		 * 2. conversion rates (treatment conv / treatment results; per-treatment)
+		 * 3. % tested (# tested / total results; per-treatment)
+		 * 4. Standard error ( Sqrt( (#3 * (1 - #3)) / # tested in treatment ); per treatment )
+		 * 5. 95% confidence level ( #4 * 1.96, split across #2; per-treatment )
+		 * 6. z-score
+		 */
+	}
+	
+	/**
+	 *
+	 * @param Scenario_Experiment $experiment
+	 * @return array 
+	 */
+	private function _treatmentMatrix(Scenario_Experiment $experiment) {
+		if ($experiment->isMultiVar()) {
+			$tmp = array();
+			foreach($experiment->getChildren() as $cxp) {
+				/* @var $cxp Scenario_Experiment */
+				$tmp[$cxp->getExperimentID()] = array_keys($experiment->getWeightings());
+			}
+			if (count($tmp) == 0) return array();
+			ksort($tmp);
+			$out = array();
+			foreach($tmp[0] as $val) {
+				$out[] = array($val);
+			}
+			if (count($tmp) == 1) return $out;
+			for($i = 1; $i < count($order); $i++) {
+				$old = $out;
+				$out = array();
+				foreach($tmp[$i] as $right) {
+					foreach($old as $left) {
+						$out[] = array_merge($left, array($right));
+					}
+				}
+			}
+			return $out;
+		} else {
+			$tmp = array_keys($experiment->getWeightings());
+			$out = array();
+			foreach($tmp as $k) $out[] = array($k);
+			return $out;
+		}
 	}
 	
 }

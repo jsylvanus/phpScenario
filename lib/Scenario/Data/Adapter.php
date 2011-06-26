@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -27,7 +27,7 @@
  * @abstract
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 abstract class Scenario_Data_Adapter {
@@ -67,9 +67,10 @@ abstract class Scenario_Data_Adapter {
      * Fetch a test from the data source by its unique name
      *
      * @param string $name      Unique name of the desired experiment record.
+	 * @param string $parent	Parent experiment if the requested experiment is part of a multivariate experiment. (Optional)
      * @return Scenario_Experiment    The test object associated with the provided unique name. Returns null if not found.
      */
-    public abstract function GetExperimentByName($name);
+    public abstract function GetExperimentByName($name, $parent = null);
 
     /**
      * Get extended data for an experiment.
@@ -77,9 +78,10 @@ abstract class Scenario_Data_Adapter {
      * Deserialize and return the data stored in association with an experiment.
      *
      * @param string $name      Unique name of the desired experiment record.
+	 * @param string $parent	Parent experiment if the requested experiment is part of a multivariate experiment. (Optional)
      * @return array            Array of data stored in the requested test record.
      */
-    public abstract function GetExperimentData($name);
+    public abstract function GetExperimentData($name, $parent = null);
 
     /**
      * Clears all records for a given treatment/experiment combo.
@@ -106,11 +108,13 @@ abstract class Scenario_Data_Adapter {
     /**
      * Get all existing experiments.
      *
-     * Retrieves an array of stored Scenario_Experiment objects.
+     * Retrieves an array of stored Scenario_Experiment objects. If parent is null, retrieves all top-level experiments.
+	 * If parent is specified, returns only children of that experiment.
      *
+	 * @param Scenario_Experiment|string Parent experiment, if you want only children of a specific multivariate.
      * @return array An array of Scenario_Experiment objects.
      */
-    public abstract function GetExperiments();
+    public abstract function GetExperiments($parent = null);
 
     /**
      * Add an experiment
@@ -121,7 +125,7 @@ abstract class Scenario_Data_Adapter {
      * @param array $data       Optional data to be serialized in the record.
      * @return Scenario_Experiment    The created experiment object.
      */
-    public abstract function AddExperiment($name, $data = array());
+    public abstract function AddExperiment($name, $data = array(), $parent = null);
 
     /**
      * Get an experiment.
@@ -130,13 +134,11 @@ abstract class Scenario_Data_Adapter {
      *
      * @param string $experimentname Name of the experiment. May be case sensitive.
      * @param bool $create Whether or not to create the experiment if it doesn't exist. (Optional)
+	 * @param Scenario_Experiment|string $parent Parent experiment if this is part of a multivariate experiment. (Optional)
      * @return Scenario_Experiment The requested experiment object, or null if unavailable & not created.
      */
-    public function GetExperiment($experimentname, $create = true) {
-        $experiment = $this->GetExperimentByName($experimentname);
-        if (null === $experiment && $create) {
-            $experiment = $this->AddExperiment($experimentname);
-        }
+    public function GetExperiment($experimentname, $create = true, $parent = null) {
+        $experiment = $this->GetExperimentByName($experimentname, $parent);
         return $experiment;
     }
 

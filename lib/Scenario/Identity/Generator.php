@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,7 +26,7 @@
  * @deprecated Deprecated since version 0.1, use static methods in Scenario_Identity.
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Identity_Generator {

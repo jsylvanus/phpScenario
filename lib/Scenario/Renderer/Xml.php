@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -31,20 +31,34 @@ require_once 'Scenario/Renderer/Abstract.php';
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
 
     const AS_HTML = 'html';
     const AS_XML = 'xml';
+	
+	/**
+	 *
+	 * @var Scenario_Core
+	 */
+	private $_core;
+	
+	public function getCore() {
+		return $this->_core;
+	}
 
     /**
      *
      * @param string $stylesheet
+	 * @param Scenario_Core $core
      */
-    public function __construct($stylesheet = self::AS_XML) { // see also: html
+    public function __construct($stylesheet = self::AS_XML, $core = null) { // see also: html
         $this->setTranslator($stylesheet);
+		if ($core == null) {
+			$this->_core = Scenario_Core::getInstance();
+		}
     }
 
     /**
@@ -84,12 +98,14 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
      * Renders a result set in XML. To render multiple experiments, merge the
      * collections, or render them individually.
      *
+	 * @deprecated
      * @param Scenario_ResultSet $results   The resultset to render.
      * @param bool $capture     (optional) Whether to capture the results rather than render them to output.
      * @return string   The rendered result document as a string.
      */
     public function renderSet(Scenario_ResultSet $results, $capture = false) {
-        $results = $this->resultsAsXml($results);
+		
+        $results = $this->resultsAsXml($this->resultSetToAnalyzerArray($results));
 
         if ($this->getTranslator() == self::AS_XML) {
             $output = $results->saveXML();
@@ -114,6 +130,34 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
 
         return $output;
     }
+	
+	private function resultSetToAnalyzerArray(Scenario_ResultSet $resultSet) {
+		$analyzers = array();
+		$experiments = $this->getExperimentsFromResultSet($resultSet);
+		
+		/** @see Scenario_Data_Analyzer */
+		require_once 'Scenario/Data/Analyzer.php';
+		
+		foreach($experiments as $exp) {
+			$analyzers[] = new Scenario_Data_Analyzer($this->getCore(), $exp);
+		}
+		
+		return $analyzers;
+	}
+	
+	private function getExperimentsFromResultSet(Scenario_ResultSet $results) {
+		$names = array();
+		$experiments = array();
+		foreach($results as $result) {
+			$test = $result->isMultivar() ? $result->getParent() : $result->getExperiment();
+			$id = $test->getExperimentID();
+			if (!in_array($id, $names)) {
+				$names[] = $id;
+				$experiments[$id] = $test;
+			}
+		}
+		return $experiments;
+	}
 
     /**
      * Translates the provided xml and xsl DOMDocuments to string
@@ -133,131 +177,84 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
     /**
      * Translates a result or resultset into an XML DOMDocument.
      *
-     * @param Scenario_Result|Scenario_ResultSet $resultSet
+     * @param Scenario_Data_Analyzer|array $analyzers
      * @return DOMDocument
      */
-    public function resultsAsXml($resultSet) {
-        $xml = new XMLWriter();
-        $xml->openMemory();
+    public function resultsAsXml($analyzers) {
+			
+			if ($analyzers instanceof Scenario_ResultSet) {
+				$analyzers = $this->resultSetToAnalyzerArray($analyzers);
+			} else if (!is_array($analyzers)) {
+				$lastExp = $analyzers->getLastExperiment();
+				if ($lastExp != null) {
+					$expname = $lastExp->getExperimentID();
+					$analyzers = array($expname => $analyzers);
+				} else {
+					require_once 'Scenario/Exception.php';
+					throw new Scenario_Exception('Analyzer provided had not analyzed anything.');
+				}
+			}
 
-        $data = $this->getDataFromResults($resultSet);
+			
+			$xml = new XMLWriter();
+			$xml->openMemory();
 
-        $xml->startElement('experimentresults'); // root
-        $xml->writeAttribute('totalresults', $data['totalRecords']);
+			$xml->startElement('experimentresults'); // root
+			// $xml->writeAttribute('totalresults', $data['totalRecords']); // no longer gathered across all experiments
 
-        foreach($data['results'] as $expid => $results) {
+			foreach($analyzers as $idx => $analyzer) {
 
-            $xml->startElement('experiment');
+				$results = $analyzer->getResults(false);
+				foreach($results as $expname => $analysis) {
+					// $results = $results[$expname];
 
-            $controlName = 'default'; // maybe make this an option eventually?
-            $cTotal = $results[$controlName]['total'];
-            $cComplete = $results[$controlName]['completed'];
-            $cRate = floatval($cComplete) / floatval($cTotal);
+					$xml->startElement('experiment');
+					$xml->writeAttribute('name', $expname);
+					if ($analysis['_multivar']) {
+						$xml->writeAttribute('multivar', 'multivar');
+						// sub-experiment names?
+					}
 
-            $xml->writeAttribute('name', $expid);
+					$stats = $analysis['analysis'];
+					$xml->writeAttribute('total', $stats['total_tested']);
+					$xml->writeAttribute('converted', $stats['total_converted']);
+					$xml->writeAttribute('conversionrate', $stats['conversion_rate']);
 
-            $eTotal = $results['_total'];
-            $xml->writeAttribute('total', $eTotal);
+					foreach($stats['treatments'] as $tname => $treatment) {
+						$xml->startElement('treatment');
+						$xml->writeAttribute('name', $tname);
+						$xml->writeAttribute('total', $treatment['total_tested']);
+						$xml->writeAttribute('converted', $treatment['total_converted']);
+						$xml->writeAttribute('conversionrate', $treatment['conversion_rate']);
+						$xml->writeAttribute('percenttested', $treatment['percent_tested']);
+						$xml->writeAttribute('stderror', $treatment['standard_error']);
+						$xml->writeAttribute('highconfidence', $treatment['high_confidence']);
+						if ($tname != 'default') {
+							$xml->writeAttribute('zscore', $treatment['z_score']);
+						} else {
+							$xml->writeAttribute('control', 'control');
+						}
+						$xml->endElement(); // treatment
+					}
+					$xml->endElement(); // experiment
+					
+				}
+			}
 
-            foreach ($results as $key => $val) {
+			$xml->endElement(); // experimentresults (root)
 
-                if ($key != '_total') {
-                    $tTotal = $val['total'];
-                    $tComplete = $val['completed'];
-                    $tRate = floatval($tComplete) / floatval($tTotal);
-                    
-                    $xml->startElement('treatment');
-                    $xml->writeAttribute('name', $key);
-
-                    if ($key == $controlName) {
-                        $xml->writeAttribute('control', 'control');
-                    }
-
-					$this->_xmlSingleTag($xml, 'rawdata', array('total' => $tTotal, 'completed' => $tComplete));
-                    
-					$stats = array('conversion' => $tRate * 100.0);
-					if ($key != $controlName) {
-                        $stats['zscore'] = ($tRate - $cRate) / sqrt( ( ($tRate * (1.0 - $tRate)) / floatval($tTotal)) + ( ($cRate * (1.0 - $cRate)) / floatval($cTotal)) );
-                    }
-					$this->_xmlSingleTag($xml, 'statistics', $stats);
-
-                    $xml->endElement(); // treatment
-                }
-                
-            }
-            
-            $xml->endElement(); // experiment
-        }
-
-        $xml->endElement(); // experimentresults (root)
-
-        $dom = new DOMDocument;
-        $dom->loadXML($xml->outputMemory());
-        return $dom;
+			$dom = new DOMDocument;
+			$dom->loadXML($xml->outputMemory());
+			return $dom;
     }
 	
-	private function _xmlSingleTag($xml, $tagname, $atts) {
-		$xml->startElement($tagname);
-		foreach($atts as $att => $val) {
-			$xml->writeAttribute($att, $val);
+		private function _xmlSingleTag($xml, $tagname, $atts) {
+			$xml->startElement($tagname);
+			foreach($atts as $att => $val) {
+				$xml->writeAttribute($att, $val);
+			}
+			$xml->endElement();
 		}
-		$xml->endElement();
-	}
-
-    /**
-     * Get an array that summarizes the result set.
-     *
-     * Compiles resultset data into an array of summarized data, including
-     * number of results and number completed for each experiment and treatment.
-     *
-     * @param Scenario_ResultSet $resultSet
-     * @return array
-     */
-    private function getDataFromResults($resultSet) {
-
-        if ($resultSet instanceof Scenario_Result) {
-            require_once 'Scenario/ResultSet.php';
-            $resultSet = new Scenario_ResultSet(array($resultSet));
-        }
-
-        if (!($resultSet instanceof Scenario_ResultSet)) {
-            require_once 'Scenario/Exception.php';
-            throw new Scenario_Exception('getDataFromResults only accepts Scenario_Result and Scenario_ResultSet objects.');
-        }
-
-        $data = array(
-            'results' => array(),
-            'totalRecords' => 0
-        );
-
-        foreach($resultSet as $result) {
-            if ($result instanceof Scenario_Result) {
-                $expid = $result->getExperiment()->getExperimentID();
-                $treatment = $result->getTreatment()->getName();
-                if (!array_key_exists($expid, $data['results'])) {
-                    $data['results'][$expid] = array(
-                        '_total' => 0
-                    );
-                }
-                if (!array_key_exists($treatment, $data['results'][$expid])) {
-                    $data['results'][$expid][$treatment] = array(
-                        'total' => 0,
-                        'completed' => 0,
-                    );
-                }
-                $data['results'][$expid][$treatment]['total']++;
-                if ($result->isCompleted())
-                    $data['results'][$expid][$treatment]['completed']++;
-                $data['totalRecords']++;
-                $data['results'][$expid]['_total']++;
-            } else {
-                require_once 'Scenario/Exception.php';
-                throw new Scenario_Exception('Scenario_ResultSet must contain only Scenario_Result objects.');
-            }
-        }
-
-        return $data;
-    }
 
     /**
      * Load an XSL file from Xslt subdir.

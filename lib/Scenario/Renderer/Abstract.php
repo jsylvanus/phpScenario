@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -27,7 +27,7 @@
  * @abstract
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 abstract class Scenario_Renderer_Abstract {
@@ -106,8 +106,11 @@ abstract class Scenario_Renderer_Abstract {
     /**
      * renderSet
      *
+	 * @deprecated
      * Render the resultset of a single experiment
      */
     public abstract function renderSet(Scenario_ResultSet $results);
+	
+	// public abstract function render($experiment_name);
 
 }

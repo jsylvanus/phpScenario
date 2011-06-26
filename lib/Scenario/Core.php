@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,7 +26,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Core {
@@ -276,6 +276,27 @@ class Scenario_Core {
             $treatment->finish($identity);
     }
     
+	/**
+	 *
+	 * @param type $experiment
+	 * @param type $structure
+	 * @param type $settings 
+	 */
+	public static function BeginMultivariate($experiment, $structure = null, $settings = null) {
+		if (!($experiment instanceof Scenario_Experiment))
+			$experiment = self::getInstance()->getExperiment($experiment, $settings);
+		if ($structure != null) $experiment->setMultiVars($structure);
+		self::getInstance()->pushMultivariate($experiment);
+	}
+	
+	/**
+	 *
+	 * @param type $which 
+	 */
+	public static function EndMultivariate($which = null) {
+		self::getInstance()->popMultivariate($which);
+	}
+	
     //-----nonstatic members below-----
 
     /**
@@ -494,31 +515,32 @@ class Scenario_Core {
      * @param string $experimentname
      * @return Scenario_Experiment
      */
-    public function getExperiment($experimentname) {
-        $prefix = $this->getOption('classPrefix');
-
-        $className = $experimentname;
-        
-        if ($prefix != null) $className = $prefix . ucfirst($className);
-
-        if (class_exists($className) && is_subclass_of($className, 'Scenario_Experiment')) {
-
-            // instantiate the custom class
-            return new $className($experimentname);
-
-        } else if ($this->getAdapter() !== null) {
-
-            // failing custom creation, we'd much prefer to get it from the database if we can...
-            $exp = $this->getAdapter()->GetExperimentByName($experimentname);
-            if ($exp != null) return $exp;
-
-        }
-        
-        // default to an experiment with no row ID.
-        require_once 'Scenario/Experiment.php';
-        return new Scenario_Experiment($experimentname);
+    public function getExperiment($experimentname, $options = array()) {
+		
+		$adapter = $this->getAdapter();
+		$cmv = $this->currentMultivariate();
+		
+		$exp = $adapter->GetExperiment($experimentname, false, $cmv);
+		
+		if ($exp === null) {
+			
+			if ($cmv !== null) {
+				$options['parent'] = $cmv;
+			}
+			
+			/**
+			 * @see Scenario_Experiment
+			 */
+			require_once 'Scenario/Experiment.php';
+			
+			$exp = new Scenario_Experiment($experimentname, null, true, $options);
+			
+		}
+		
+		return $exp;
+		
     }
-
+	
     /**
      * Retrieve the entire configuration array.
      *

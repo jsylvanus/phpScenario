@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -32,7 +32,7 @@ require_once 'Scenario/Data/Adapter.php';
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2010 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
@@ -146,22 +146,58 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
      * Fetch an experiment from the data source by its unique name. May be case sensitive.
      *
      * @param string $name      Unique name of the desired experiment record.
+	 * @param Scenario_Experiment|string $parent	Parent experiment (Optional)
      * @return Scenario_Experiment    The experiment object associated with the provided unique name. Returns null if not found.
      */
-    public function GetExperimentByName($name) {
+    public function GetExperimentByName($name, $parent = null) {
+		
+		if ($parent !== null && is_string($parent))
+			$parent = $this->GetExperimentByName($parent);
+		
+		if ($parent !== null && !($parent instanceof Scenario_Experiment)) {
+			require_once 'Scenario/Exception.php';
+			throw new Scenario_Exception('Parent must be a string or instance of Scenario_Experiment');
+		}
+		
         $query = $this->getDbAdapter()->select()->from($this->experimentsTable)
                 ->where('name = ?',$name);
+		if ($parent !== null) {
+			if ($parent->getRowID() === null) {
+				require_once 'Scenario/Exception.php';
+				throw new Scenario_Exception('Cannot fetch child experiments for a parent with no row ID');
+			}
+			$query->where('parent_id = ?',$parent->getRowID());
+		} else {
+			$query->where('parent_id IS NULL');
+		}
         $result = $this->getDbAdapter()->fetchRow($query);
         if ($result == null) {
             return null;
         }
         
+		$data = null;
+		if (!empty($result['data']))
+			$data = unserialize($result['data']);
+		
         /**
          * @see Scenario_Experiment
          */
         require_once 'Scenario/Experiment.php';
+		
+		if ($parent === null) {
+			$children = $this->GetExperiments($name);
+			if (count($children) > 0) {
+				$childvals = array();
+				foreach($children as $k => $val) {
+					$childvals[$val->getExperimentID()] = $val;
+				}
+				$data['children'] = $childvals;
+			}
+		} else {
+			$data['parent'] = $parent;
+		}
 
-        return new Scenario_Experiment($result['name'], $result['id'], false);
+        return new Scenario_Experiment($result['name'], $result['id'], false, $data);
     }
 
     /**
@@ -258,13 +294,31 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
     /**
      * Get all existing experiments.
      *
-     * Retrieves an array of stored Scenario_Experiment objects.
+     * Retrieves an array of stored Scenario_Experiment objects. If parent is null, retrieves all top-level experiments.
+	 * If parent is specified, returns only children of that experiment.
      *
+	 * @param Scenario_Experiment|string Parent experiment, if you want only children of a specific multivariate.
      * @return array An array of Scenario_Experiment objects.
      */
-    public function GetExperiments() {
-
-        $this->getDbAdapter()->select()->from($this->experimentsTable);
+    public function GetExperiments($parent = null) {
+		$parent_id = null;
+		if ($parent !== null) {
+			if (is_string($parent)) {
+				$parent_id = $this->GetExperimentID($parent);
+			} else if ($parent instanceof Scenario_Experiment) {
+				$parent_id = $parent->getRowID();
+			} else {
+				require_once 'Scenario/Exception.php';
+				throw new Scenario_Exception('Parent must be null, a string name, or an instance of Scenario_Experiment');
+			}
+		}
+		
+		$query = $this->getDbAdapter()->select()->from($this->experimentsTable);
+		if ($parent_id !== null) {
+			$query->where('parent_id = ?', $parent_id);
+		} else {
+			$query->where('parent_id IS NULL');
+		}
         $results = $this->getDbAdapter()->fetchAll($query);
 
         $experiments = array();
@@ -275,7 +329,9 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
         require_once 'Scenario/Experiment.php';
 
         foreach($results as $key => $val) {
-            $experiments[] = new Scenario_Experiment($val['name'], $val['id'], false);
+			$data = null;
+			if (!empty($val['data'])) $data = unserialize($val['data']);
+            $experiments[] = new Scenario_Experiment($val['name'], $val['id'], false, $data);
         }
 
         return $experiments;
@@ -287,9 +343,14 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
      * @param string $name
      * @return int
      */
-    public function GetExperimentID($name) {
+    public function GetExperimentID($name, $parent_id = null) {
         $query = $this->getDbAdapter()->select()->from($this->experimentsTable)
                 ->where('name = ?',$name);
+		if ($parent_id !== null) {
+			$query->where('parent_id = ?', $parent_id);
+		} else {
+			$query->where('parent_id IS NULL');
+		}
         $result = $this->getDbAdapter()->fetchRow($query);
         if ($result == null) {
             return null;
@@ -307,7 +368,12 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
      * @return Scenario_Treatment|null
      */
     public function GetTreatmentForIdentity(Scenario_Experiment $experiment, Scenario_Identity $id) {
-        $experiment_id = $this->GetExperimentID($experiment->getExperimentID());
+		if ($experiment->getRowID() === null) {
+			$parent = $experiment->getParent();
+			$experiment_id = $this->GetExperimentID($experiment->getExperimentID(), $parent === null ? null : $parent->getRowID());
+		} else {
+			$experiment_id = $experiment->getRowID();
+		}
         if ($experiment_id == null) return null;
 
         $query = $this->getDbAdapter()->select()
@@ -502,22 +568,39 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
     public function GetResults($experiment, $start = 0, $limit = 5000) {
         if (is_string($experiment))
             $experiment = $this->GetExperimentByName($experiment);
+		
         if (!($experiment instanceof Scenario_Experiment)) {
             require_once 'Scenario/Data/Exception.php';
             throw new Scenario_Data_Exception('Experiment is not an instance of Scenario_Experiment');
         }
 
         $exps = $this->experimentsTable;
-        $trts = $this->treatmentsTable;
-        $usrs = $this->usersTreatmentsTable;
-
-        $query = $this->getDbAdapter()->select()
-                ->from($usrs)->joinLeft($trts, $usrs . '.treatment_id = ' . $trts . '.id')
-                ->where($trts.'.experiment_id = ?', $experiment->getRowID())
-				->limit($limit, $start);
-
-        $results = $this->getDbAdapter()->fetchAll($query);
-
+        
+		$query = $this->getDbAdapter()->select()
+			->from(array('u'=>$this->usersTreatmentsTable),array())
+			->joinLeft(array('t'=>$this->treatmentsTable), 'u.treatment_id = t.id', array())
+			->joinLeft(array('e'=>$exps), 'e.id = t.experiment_id', array())
+			->joinLeft(array('p'=>$exps), 'p.id = e.parent_id', array())
+			->columns(array(
+				'user_id' => 'u.identity',
+				'completed' => 'u.completed',
+				'treatment_id' => 't.id',
+				'treatment_name' => 't.name',
+				'experiment_name' => 'e.name',
+				'experiment_id' => 'e.id',
+				'experiment_data' => 'e.data',
+				'parent_id' => 'e.parent_id',
+				'parent_name' => 'p.name',
+				'parent_data' => 'p.data'
+			))->limit($limit,$start)
+			->order('user_id DESC');
+		if ($experiment->isMultiVar()) {
+			$query->where('e.parent_id = ?', $experiment->getRowID());
+		} else {
+            $query->where('t.experiment_id = ?', $experiment->getRowID());
+		}
+		$results = $this->getDbAdapter()->fetchAll($query);
+		
         /**
          * @see Scenario_ResultSet
          */
@@ -535,9 +618,10 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
 
         $out = new Scenario_ResultSet();
         foreach($results as $key => $val) {
-            $out[] = new Scenario_Result($experiment, $val['name'], new Scenario_Identity($val['identity']), !!$val['completed']);
+			$res = new Scenario_Result($val);
+            $out[] = $res;
         }
-        return $out;
+		return $out;
     }
 
     /**
@@ -574,8 +658,8 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
      * @param string $name
      * @todo
      */
-    public function GetExperimentData($name) {
-
+    public function GetExperimentData($name, $parent = null) {
+		
     }
 
     /**
@@ -583,15 +667,25 @@ class Scenario_Data_Adapter_Zend extends Scenario_Data_Adapter {
      *
      * @param string $name      Unique name to assign the experiment.
      * @param array $data       Optional data to be serialized in the record.
+	 * @param Scenario_Experiment|string	Parent experiment (optional).
      * @return Scenario_Experiment    The created experiment object.
      */
-    public function AddExperiment($name, $data = array()) {
+    public function AddExperiment($name, $data = array(), $parent = null) {
         $db = $this->getDbAdapter();
-        $changes = $db->insert($this->experimentsTable, array(
-            'name' => $this->quote($name, null),
-            'data' => serialize($data)
-        ));
-        return $this->GetExperimentByName($name);
+		$changes = array(
+			'name' => $this->quote($name, null),
+			'data' => serialize($data)
+		);
+		if ($parent !== null) {
+			if (is_string($parent)) {
+				$parent = $this->GetExperimentByName($parent);
+			}
+			$changes['parent_id'] = $parent->getRowID();
+		}
+		
+		$changed = $db->insert($this->experimentsTable, $changes);
+		
+        return $this->GetExperimentByName($name, $parent);
     }
 
     /**
