@@ -1,0 +1,21 @@
+<phpunit bootstrap="./bootstrap.php" colors="true">
+
+    <testsuite name="Scenario">
+        <directory>./lib/</directory>
+    </testsuite>
+
+    <filter>
+        <whitelist>
+            <directory suffix=".php">../lib</directory>
+        </whitelist>
+    </filter>
+
+    <logging>
+        <log type="coverage-html" target="./logs/coverage" title="PHPScenario"
+             charset="UTF-8" yui="true" highlight="true"
+             lowUpperBound="35" highLowerBound="70"/>
+        <log type="coverage-clover" target="./logs/coverage-clover.xml"/>
+        <log type="junit" target="./logs/coverage-junit.xml" logIncompleteSkipped="false"/>
+    </logging>
+
+</phpunit>
