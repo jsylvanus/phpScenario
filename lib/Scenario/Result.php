@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,7 +26,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Result {
@@ -147,7 +147,7 @@ class Scenario_Result {
 				$this->parent_name, 
 				$this->parent_id, 
 				false, 
-				array_merge($this->parent_data, array('children' => $this->getExperiment()))
+				array_merge($this->parent_data, array('children' => array($this->getExperiment())))
 			);
 		}
 		return $this->_parent;

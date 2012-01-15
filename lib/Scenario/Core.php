@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,7 +26,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Core {
@@ -271,9 +271,14 @@ class Scenario_Core {
     public static function Complete($experiment, $identity = null) {
         if ($identity == null)
             $identity = self::Identity();
-        $treatment = self::Treatment($experiment, $identity, false);
-        if ($treatment !== null)
-            $treatment->finish($identity);
+        if (is_string($experiment)) {
+           $experiment = self::Experiment($experiment);
+        }
+        if (! $experiment instanceof Scenario_Experiment ) {
+           require_once 'Scenario/Exception.php';
+           throw new Scenario_Exception('Experiment is not an instance of Scenario_Experiment or a string representing one.');
+        }
+        return $experiment->finish($identity);
     }
     
 	/**

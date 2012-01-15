@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -31,7 +31,7 @@ require_once 'Scenario/Renderer/Abstract.php';
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
@@ -104,7 +104,6 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
      * @return string   The rendered result document as a string.
      */
     public function renderSet(Scenario_ResultSet $results, $capture = false) {
-		
         $results = $this->resultsAsXml($this->resultSetToAnalyzerArray($results));
 
         if ($this->getTranslator() == self::AS_XML) {
@@ -138,8 +137,14 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
 		/** @see Scenario_Data_Analyzer */
 		require_once 'Scenario/Data/Analyzer.php';
 		
+		$analyzed = array();
+		
 		foreach($experiments as $exp) {
-			$analyzers[] = new Scenario_Data_Analyzer($this->getCore(), $exp);
+		   $actual_experiment = ($exp->isChild()) ? $exp->getParent() : $exp;
+		   if (!in_array($actual_experiment->getRowId(), $analyzed)) {
+		      $analyzers[] = new Scenario_Data_Analyzer($this->getCore(), $actual_experiment);
+		      $analyzed[] = $actual_experiment->getRowId();
+		   }
 		}
 		
 		return $analyzers;
@@ -181,7 +186,7 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
      * @return DOMDocument
      */
     public function resultsAsXml($analyzers) {
-			
+       			
 			if ($analyzers instanceof Scenario_ResultSet) {
 				$analyzers = $this->resultSetToAnalyzerArray($analyzers);
 			} else if (!is_array($analyzers)) {
@@ -211,7 +216,7 @@ class Scenario_Renderer_Xml extends Scenario_Renderer_Abstract {
 					$xml->startElement('experiment');
 					$xml->writeAttribute('name', $expname);
 					if ($analysis['_multivar']) {
-						$xml->writeAttribute('multivar', 'multivar');
+						$xml->writeAttribute('multivar', implode(':',$analysis['_order']));
 						// sub-experiment names?
 					}
 

@@ -10,7 +10,27 @@ xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
   </div>
 </xsl:template>
 
+<xsl:template name="tokenize_th">
+    <xsl:param name="string" />
+    <xsl:param name="delimiter" select="':'" />
+    <xsl:choose>
+        <xsl:when test="$delimiter and contains($string, $delimiter)">
+            <th class="t-name">
+                <xsl:value-of select="substring-before($string, $delimiter)" />
+            </th>
+            <xsl:call-template name="tokenize_th">
+                <xsl:with-param name="string" select="substring-after($string, $delimiter)" />
+                <xsl:with-param name="delimiter" select="$delimiter" />
+            </xsl:call-template>
+        </xsl:when>
+        <xsl:otherwise>
+            <th class="t-name"><xsl:value-of select="$string" /></th>
+        </xsl:otherwise>
+    </xsl:choose>
+</xsl:template>
+
 <xsl:template match="experiment">
+    <xsl:variable name="multivar" select="not(not(@multivar))" />
     <div class="experiment" id="experiment-{translate(normalize-space(@name),' ','-')}">
         <h2>Experiment &quot;<xsl:value-of select="@name" />&quot;</h2>
         <ul class="overall-stats">
@@ -22,19 +42,33 @@ xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
             <caption>Experiment &quot;<xsl:value-of select="@name" />&quot; Results</caption>
             <thead>
                 <tr class="exp-header">
-                    <th class="t-name">Treatment</th>
+                    <xsl:if test="$multivar">
+                        <xsl:call-template name="tokenize_th">
+                            <xsl:with-param name="string" select="@multivar" />
+                        </xsl:call-template>
+                    </xsl:if>
+                    <xsl:if test="not($multivar)">
+                        <th class="t-name">Treatment</th> 
+                    </xsl:if>
                     <th class="percent_tested">Pct.Tested</th>
                     <th class="tested">Tested</th>
                     <th class="completed">Completed</th>
-										<th class="converted">Conv. Rate</th>
-										<th class="within">Within</th>
-										<th class="stderror">Std.Error</th>
+					<th class="converted">Conv. Rate</th>
+					<th class="within">Within</th>
+					<th class="stderror">Std.Error</th>
                     <th class="zscore">Z-Score</th>
                 </tr>
             </thead>
             <xsl:for-each select="treatment">
                 <tr class="treatment-results">
-                    <th class="t-name">&quot;<xsl:value-of select="@name" />&quot;</th>
+                    <xsl:if test="$multivar">
+                        <xsl:call-template name="tokenize_th">
+                            <xsl:with-param name="string" select="@name" />
+                        </xsl:call-template>
+                    </xsl:if>
+                    <xsl:if test="not($multivar)">
+                        <th class="t-name"><xsl:value-of select="@name" /></th> 
+                    </xsl:if>
                     <td class="percent_tested"><xsl:value-of select="format-number(number(@percenttested),'#0.##%')" /></td>
                     <td class="tested"><xsl:value-of select="@total" /></td>
                     <td class="completed"><xsl:value-of select="@converted" /></td>

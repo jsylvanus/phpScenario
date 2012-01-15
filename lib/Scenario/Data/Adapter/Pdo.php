@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -30,7 +30,7 @@ require_once 'Scenario/Data/Adapter.php';
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Data_Adapter_Pdo extends Scenario_Data_Adapter {
@@ -515,6 +515,7 @@ class Scenario_Data_Adapter_Pdo extends Scenario_Data_Adapter {
     /**
      * Modify a treatment/id combo as being a completed goal
      *
+     * @deprecated Use FinishExperiment instead
      * @param Scenario_Treatment $treatment
      * @param Scenario_Identity $id
      * @return bool Success
@@ -543,6 +544,45 @@ class Scenario_Data_Adapter_Pdo extends Scenario_Data_Adapter {
         
         return $result->rowCount() > 0;
     }
+
+    /**
+      * Finish an experiment for a given identity
+      *
+      * Mark a given experiment (be it multivar or not) as complete for a given identity.
+      * If a matching treatment does not exist, the call should be ignored, rather than 
+      * creating a new treatment.
+      *
+      * @param string|Scenario_Experiment $experiment 
+      * @param Scenario_Identity $id 
+      */
+     public function FinishExperiment($experiment, Scenario_Identity $id) {
+        if (is_string($experiment)) {
+           $experiment = $this->GetExperimentByName($experiment);
+        }
+        if ($experiment->isMultiVar()) {
+           
+           $children = array();
+           foreach($experiment->getChildren() as $child) {
+              $children[] = $child->getRowId();
+           }
+           $children = implode(',', $children);
+
+           $sql = "UPDATE {$this->usersTreatmentsTable} SET completed = ? 
+                  WHERE identity = ? AND experiment_id IN ({$children})";
+           
+           $result = $this->prepare($sql, array(1, $id->getDbIdent()));
+
+        } else {
+           
+           $sql = "UPDATE {$this->usersTreatmentsTable} SET completed = ?
+                  WHERE identity = ? AND experiment_id = ?";
+           
+           $result = $this->prepare($sql, array(1, $id->getDbIdent(), $experiment->getRowId()));
+           
+        }
+        
+        return $result->rowCount() > 0;
+     }
 
     /**
      *

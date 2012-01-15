@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -25,7 +25,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Experiment {
@@ -101,7 +101,7 @@ class Scenario_Experiment {
         if (is_array($options) && array_key_exists('children', $options)) {
 			$this->_children = $options['children'];
 			if (count($this->_children) > 0) {
-				foreach($this->_children as $child) {
+			   foreach($this->_children as $child) {
 					$child->setParent($this);
 				}
 			}
@@ -508,6 +508,10 @@ class Scenario_Experiment {
     public function getCore() {
         require_once 'Scenario/Core.php';
         return Scenario_Core::getInstance();
+    }
+    
+    public function finish(Scenario_Identity $id) {
+       return $this->getCore()->getAdapter()->FinishExperiment($this, $id);
     }
 
 }

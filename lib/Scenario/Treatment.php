@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,7 +26,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Treatment {
@@ -163,7 +163,7 @@ class Scenario_Treatment {
     public function finish(Scenario_Identity $id) {
         $adapter = $this->getCore()->getAdapter();
         if ($adapter !== null && $this->isValid())
-            $adapter->FinishTreatment($this, $id);
+            $adapter->FinishExperiment($this->_parent, $id);
     }
 
     /**

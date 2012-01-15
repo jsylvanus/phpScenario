@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -26,7 +26,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 class Scenario_Data_Analyzer {
@@ -125,6 +125,7 @@ class Scenario_Data_Analyzer {
 			$numresults = count($results);
 			$start += $limit;
 			foreach($results as $result) {
+			   
 				if ($result instanceof Scenario_Result) {
 					$data->addResult($result);
 				} else {
@@ -134,7 +135,7 @@ class Scenario_Data_Analyzer {
 			}
 			unset($results);
 		} while ($numresults >= $limit);
-		
+				
 		return $data;
 	}
 	
@@ -145,16 +146,18 @@ class Scenario_Data_Analyzer {
 		foreach($this->_rawData->getExperimentNames() as $expName) {
 			// raw data array
 			$data = $this->_rawData->getExperimentData($expName);
-			if (!$data['_multivar']) {
-				// multivar experiment
-				$data['analysis'] = array(
-					'total_tested'		=> 0,
-					'total_converted'	=> 0,
-					'conversion_rate'	=> 0.0,
-					'treatments'		=> array()
-				);
-				$analysis = &$data['analysis'];
-				$treatments = &$analysis['treatments'];
+			
+			$data['analysis'] = array(
+				'total_tested'		=> 0,
+				'total_converted'	=> 0,
+				'conversion_rate'	=> 0.0,
+				'treatments'		=> array()
+			);
+			$analysis = &$data['analysis'];
+			$treatments = &$analysis['treatments'];
+			
+         // if (!$data['_multivar']) {
+				
 				// first pass: totals & per-treatment c-rates
 				foreach($data['_treatments'] as $tname => $vals) {
 					$analysis['total_tested'] += $treatments[$tname]['total_tested'] = $vals['total'];
@@ -176,14 +179,19 @@ class Scenario_Data_Analyzer {
 					$cTotal = $analysis['total_tested'];
 					$tRate = $treatments[$tname]['conversion_rate'];
 					$tTotal = $vals['total'];
-					$treatments[$tname]['z_score'] = ($tRate - $cRate) / sqrt( ( ($tRate * (1.0 - $tRate)) / floatval($tTotal)) + ( ($cRate * (1.0 - $cRate)) / floatval($cTotal)) );;
+					if ($cTotal == 0 || $tTotal == 0 || $tRate == 0) {
+					   $treatments[$tname]['z_score'] = 0;
+					} else {
+					   $treatments[$tname]['z_score'] = ($tRate - $cRate) / sqrt( ( ($tRate * (1.0 - $tRate)) / floatval($tTotal)) + ( ($cRate * (1.0 - $cRate)) / floatval($cTotal)) );;
+				   }
 				}
-
-			} else {
-				// multivar
-				
-			}
-			
+         // 
+         // } else {
+         //    
+         //    // multivar version
+         //    var_dump($this->_rawData);
+         // }
+         // 
 			$results[$expName] = $data;
 		}
 		$this->_analysis = $results;

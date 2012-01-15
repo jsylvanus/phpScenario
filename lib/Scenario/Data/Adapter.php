@@ -14,7 +14,7 @@
  *
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 
@@ -27,7 +27,7 @@
  * @abstract
  * @category   Scenario
  * @package    Scenario
- * @copyright  Copyright (c) 2011 TK Studios. (http://www.tkstudios.com)
+ * @copyright  Copyright (c) 2011-2012 TK Studios. (http://www.tkstudios.com)
  * @license    http://www.phpscenario.org/license.php     New BSD License
  */
 abstract class Scenario_Data_Adapter {
@@ -210,9 +210,22 @@ abstract class Scenario_Data_Adapter {
      * treatment does not exist, the call should be ignored, rather than
      * creating a new treatment.
      *
-     * @param Scenario_Experiment $treatment
+     * @deprecated Use FinishExperiment
+     * @param Scenario_Treatment $treatment
      * @param Scenario_Identity $id
      */
     public abstract function FinishTreatment(Scenario_Treatment $treatment, Scenario_Identity $id);
+
+    /**
+     * Finish an experiment for a given identity
+     *
+     * Mark a given experiment (be it multivar or not) as complete for a given identity.
+     * If a matching treatment does not exist, the call should be ignored, rather than 
+     * creating a new treatment.
+     *
+     * @param string|Scenario_Experiment $experiment 
+     * @param Scenario_Identity $id 
+     */
+    public abstract function FinishExperiment($experiment, Scenario_Identity $id);
 
 }
